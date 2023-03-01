@@ -6,7 +6,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 //import { api } from "@/src/lib/axios";
 
-export default function Register() {
+export default function ConnectCalendar() {
 	const session = useSession();
 	const router = useRouter();
 
@@ -22,7 +22,7 @@ export default function Register() {
 			<Header>
 				<Heading as="strong">Connect yourself!</Heading>
 				<Text>
-					Connect your calendar in order to automatically update your schedule .
+					Connect your calendar in order to automatically update your schedule.
 				</Text>
 				<MultiStep size={4} currentStep={2} />
 			</Header>
