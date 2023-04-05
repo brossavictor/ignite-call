@@ -1,4 +1,7 @@
+import { api } from "@/src/lib/axios";
+import { convertTimeStringToMinutes } from "@/src/utils/convert-time-string-to-minutes";
 import { getDaysOfTheWeek } from "@/src/utils/get-days-of-the-week";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
 	Button,
 	Checkbox,
@@ -8,7 +11,7 @@ import {
 	TextInput,
 } from "@ignite-ui/react";
 import { ArrowRight } from "phosphor-react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { z } from "zod";
 import { Container, Header } from "../styles";
 import {
@@ -17,17 +20,59 @@ import {
 	IntervalInputs,
 	IntervalItem,
 	IntervalsContainer,
+	FormError,
 } from "./styles";
 
-const timeIntervalsFormSchema = z.object({});
+const timeIntervalsFormSchema = z.object({
+	intervals: z
+		.array(
+			z.object({
+				dayOfTheWeek: z.number().min(0).max(6),
+				enabled: z.boolean(),
+				startTime: z.string(),
+				endTime: z.string(),
+			})
+		)
+		.length(7)
+		.transform((intervals) =>
+			intervals.filter((intervals) => intervals.enabled)
+		)
+		.refine((intervals) => intervals.length > 0, {
+			message: "You have to select at least a day of the week.",
+		})
+		.transform((intervals) => {
+			return intervals.map((interval) => {
+				return {
+					dayOfTheWeek: interval.dayOfTheWeek,
+					startTimeInMinutes: convertTimeStringToMinutes(interval.startTime),
+					endTimeInMinutes: convertTimeStringToMinutes(interval.endTime),
+				};
+			});
+		})
+		.refine(
+			(intervals) => {
+				return intervals.every(
+					(interval) =>
+						interval.endTimeInMinutes - 60 >= interval.startTimeInMinutes
+				);
+			},
+			{
+				message: "Invalid input.",
+			}
+		),
+});
+
+type TimeIntervalsFormData = z.infer<typeof timeIntervalsFormSchema>;
 
 export default function TimeIntervals() {
 	const {
 		register,
 		handleSubmit,
 		control,
+		watch,
 		formState: { isSubmitting, errors },
 	} = useForm({
+		resolver: zodResolver(timeIntervalsFormSchema),
 		defaultValues: {
 			intervals: [
 				{
@@ -80,7 +125,13 @@ export default function TimeIntervals() {
 
 	const { fields } = useFieldArray({ control, name: "intervals" });
 
-	async function handleSetTimeIntervals() {}
+	const intervals = watch("intervals");
+
+	async function handleSetTimeIntervals(data: any) {
+		const formData = data as TimeIntervalsFormData;
+
+		await api.post("/users/time-intervals", { intervals });
+	}
 
 	return (
 		<Container>
@@ -92,23 +143,52 @@ export default function TimeIntervals() {
 
 			<IntervalBox as="form" onSubmit={handleSubmit(handleSetTimeIntervals)}>
 				<IntervalsContainer>
-					{fields.map((field) => {
+					{fields.map((field, index) => {
 						return (
 							<IntervalItem key={field.id}>
 								<IntervalDay>
-									<Checkbox />
+									<Controller
+										name={`intervals.${index}.enabled`}
+										control={control}
+										render={({ field }) => {
+											return (
+												<Checkbox
+													onCheckedChange={(checked) => {
+														field.onChange(checked === true);
+													}}
+													checked={field.value}
+												/>
+											);
+										}}
+									></Controller>
 									<Text>{daysOfTheWeek[field.dayOfTheWeek]}</Text>
 								</IntervalDay>
 								<IntervalInputs>
-									<TextInput size="sm" type="time" step={60} />
-									<TextInput size="sm" type="time" step={60} />
+									<TextInput
+										size="sm"
+										type="time"
+										step={60}
+										disabled={intervals[index].enabled === false}
+										{...register(`intervals.${index}.startTime`)}
+									/>
+									<TextInput
+										size="sm"
+										type="time"
+										step={60}
+										disabled={intervals[index].enabled === false}
+										{...register(`intervals.${index}.endTime`)}
+									/>
 								</IntervalInputs>
 							</IntervalItem>
 						);
 					})}
 				</IntervalsContainer>
 
-				<Button type="submit">
+				{errors.intervals && (
+					<FormError size="sm">{errors.intervals.message}</FormError>
+				)}
+
+				<Button type="submit" disabled={isSubmitting}>
 					Next step <ArrowRight />
 				</Button>
 			</IntervalBox>
