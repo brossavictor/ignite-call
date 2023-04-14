@@ -22,6 +22,7 @@ import {
 	IntervalsContainer,
 	FormError,
 } from "./styles";
+import { useRouter } from "next/router";
 
 const timeIntervalsFormSchema = z.object({
 	intervals: z
@@ -62,7 +63,10 @@ const timeIntervalsFormSchema = z.object({
 		),
 });
 
-type TimeIntervalsFormData = z.infer<typeof timeIntervalsFormSchema>;
+//type TimeIntervalsFormData = z.infer<typeof timeIntervalsFormSchema>;
+
+type TimeIntervalsFormInput = z.input<typeof timeIntervalsFormSchema>;
+type TimeIntervalsFormOutput = z.output<typeof timeIntervalsFormSchema>;
 
 export default function TimeIntervals() {
 	const {
@@ -71,7 +75,7 @@ export default function TimeIntervals() {
 		control,
 		watch,
 		formState: { isSubmitting, errors },
-	} = useForm({
+	} = useForm<TimeIntervalsFormInput>({
 		resolver: zodResolver(timeIntervalsFormSchema),
 		defaultValues: {
 			intervals: [
@@ -121,16 +125,31 @@ export default function TimeIntervals() {
 		},
 	});
 
+	const router = useRouter();
+
 	const daysOfTheWeek = getDaysOfTheWeek();
 
 	const { fields } = useFieldArray({ control, name: "intervals" });
 
 	const intervals = watch("intervals");
 
-	async function handleSetTimeIntervals(data: any) {
+	/* 	async function handleSetTimeIntervals(data: any) {
 		const formData = data as TimeIntervalsFormData;
 
 		await api.post("/users/time-intervals", { intervals });
+
+		await router.push("register/update-profile");
+	}
+ */
+
+	async function handleSetTimeIntervals(data: any) {
+		const { intervals } = data as TimeIntervalsFormOutput;
+
+		await api.post("/users/time-intervals", { intervals });
+	}
+
+	async function handleNavigateToNextStep() {
+		await router.push("/register/update-profile");
 	}
 
 	return (
@@ -188,7 +207,11 @@ export default function TimeIntervals() {
 					<FormError size="sm">{errors.intervals.message}</FormError>
 				)}
 
-				<Button type="submit" disabled={isSubmitting}>
+				<Button
+					onClick={handleNavigateToNextStep}
+					type="submit"
+					disabled={isSubmitting}
+				>
 					Next step <ArrowRight />
 				</Button>
 			</IntervalBox>
